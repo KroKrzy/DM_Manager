@@ -127,11 +127,21 @@ class TypyLokacji:
         if self.selected_index is None:
             return
 
-        if not messagebox.askyesno("Potwierdzenie", "Czy na pewno usunąć ten typ?"):
+        typ = self.save_data["location_types"][self.selected_index]
+        typ_nazwa = typ["nazwa"]
+
+        if not messagebox.askyesno("Potwierdzenie", f"Czy na pewno usunąć typ \"{typ_nazwa}\"?"):
             return
 
+        # Usuń typ z listy
         del self.save_data["location_types"][self.selected_index]
         self.selected_index = None
+
+        # Podmień w lokacjach na "domyślna"
+        for loc in self.save_data.get("locations", []):
+            if loc.get("typ") == typ_nazwa:
+                loc["typ"] = "domyślna"
+
         self.save()
         self.display_location_types()
 
