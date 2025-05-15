@@ -1,21 +1,23 @@
 
 import tkinter as tk
-from tkinter import Toplevel, Listbox, Button, simpledialog, messagebox
+import os
+from tkinter import Toplevel, Button, simpledialog, messagebox, Scrollbar
+from PIL import Image, ImageTk
 
 class NpcManager:
     def __init__(self, master, save_data, save_filename, on_npc_selected=None, resources_path="", assign_mode=False):
         self.save_data = save_data
         self.save_filename = save_filename
         self.on_npc_selected = on_npc_selected
+        self.resources_path = resources_path
+        self.assign_mode = assign_mode
+        self.selected_npc_id = None
 
         self.window = Toplevel(master)
         self.window.title("Zarządzanie NPC")
         self.window.geometry("400x500")
         self.window.transient(master)
         self.window.grab_set()
-        self.resources_path = resources_path
-
-        self.assign_mode = assign_mode
 
         if "npcs" not in self.save_data:
             self.save_data["npcs"] = []
@@ -23,16 +25,22 @@ class NpcManager:
         frame = tk.Frame(self.window)
         frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
 
-        scrollbar = tk.Scrollbar(frame)
-        scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+        self.canvas = tk.Canvas(frame)
+        self.scrollbar = Scrollbar(frame, orient="vertical", command=self.canvas.yview)
+        self.scrollable_frame = tk.Frame(self.canvas)
 
-        self.listbox = Listbox(frame, yscrollcommand=scrollbar.set)
-        self.listbox.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        self.scrollable_frame.bind(
+            "<Configure>",
+            lambda e: self.canvas.configure(scrollregion=self.canvas.bbox("all"))
+        )
 
-        scrollbar.config(command=self.listbox.yview)
-        self.listbox.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
+        self.canvas.create_window((0, 0), window=self.scrollable_frame, anchor="nw")
+        self.canvas.configure(yscrollcommand=self.scrollbar.set)
 
-        self.listbox.bind("<Double-Button-1>", self.handle_npc_click)
+        self.canvas.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        self.scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+
+        self.icon_refs = {}
 
         button_frame = tk.Frame(self.window)
         button_frame.pack(pady=5)
@@ -43,9 +51,39 @@ class NpcManager:
         self.refresh_list()
 
     def refresh_list(self):
-        self.listbox.delete(0, tk.END)
-        for npc in self.save_data["npcs"]:
-            self.listbox.insert(tk.END, npc.get("nazwa", "[bezimienny]"))
+        for widget in self.scrollable_frame.winfo_children():
+            widget.destroy()
+        self.icon_refs.clear()
+
+        for npc in self.save_data.get("npcs", []):
+            row = tk.Frame(self.scrollable_frame)
+            row.pack(fill=tk.X, pady=2, padx=5)
+
+            icon_label = tk.Label(row)
+            icon_label.pack(side=tk.LEFT, padx=(5, 10))
+
+            icon = None
+            icon_path = npc.get("obraz")
+            if icon_path:
+                full_path = os.path.join(self.resources_path, icon_path)
+                if os.path.isfile(full_path):
+                    try:
+                        img = Image.open(full_path)
+                        img = img.resize((20, 20), Image.LANCZOS)
+                        icon = ImageTk.PhotoImage(img)
+                    except Exception:
+                        pass
+            if not icon:
+                img = Image.new("RGB", (20, 20), color="white")
+                icon = ImageTk.PhotoImage(img)
+
+            icon_label.configure(image=icon)
+            icon_label.image = icon
+            self.icon_refs[npc["id"]] = icon
+
+            name_label = tk.Label(row, text=npc.get("nazwa", "[bezimienny]"), anchor="w")
+            name_label.pack(side=tk.LEFT, expand=True)
+            name_label.bind("<Double-Button-1>", lambda e, n=npc: self.handle_npc_click_object(n))
 
     def add_npc(self):
         from uuid import uuid4
@@ -66,17 +104,17 @@ class NpcManager:
         self.refresh_list()
 
     def delete_npc(self):
-        selection = self.listbox.curselection()
-        if not selection:
-            messagebox.showinfo("Brak wyboru", "Najpierw wybierz postać do usunięcia.")
+        npc_id = self.selected_npc_id
+        if not npc_id:
+            messagebox.showinfo("Brak wyboru", "Kliknij najpierw postać.")
             return
 
-        index = selection[0]
-        npc = self.save_data["npcs"][index]
-        if not messagebox.askyesno("Potwierdzenie", f"Czy na pewno chcesz usunąć NPC '{npc['nazwa']}'?"):
+        npc = next((n for n in self.save_data["npcs"] if n["id"] == npc_id), None)
+        if not npc:
             return
 
-        npc_id = npc["id"]
+        if not messagebox.askyesno("Potwierdzenie", f"Czy na pewno chcesz usunąć NPC '{npc.get('nazwa', '')}'?"):
+            return
 
         # Usuń NPC z każdej lokacji, do której był przypisany
         for location in self.save_data.get("locations", []):
@@ -85,20 +123,12 @@ class NpcManager:
             if "npc_ilosci" in location and npc_id in location["npc_ilosci"]:
                 del location["npc_ilosci"][npc_id]
 
-        # Usuń NPC z głównej listy
-        del self.save_data["npcs"][index]
-
+        self.save_data["npcs"] = [n for n in self.save_data["npcs"] if n["id"] != npc_id]
         self.save()
         self.refresh_list()
 
-    def handle_npc_click(self, event):
-        selection = self.listbox.curselection()
-        if not selection:
-            return
-
-        index = selection[0]
-        npc = self.save_data["npcs"][index]
-
+    def handle_npc_click_object(self, npc):
+        self.selected_npc_id = npc["id"]
         if self.assign_mode:
             self.on_npc_selected(npc)
             self.window.destroy()

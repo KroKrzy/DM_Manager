@@ -1,6 +1,8 @@
 
+import os
 import tkinter as tk
-from tkinter import Toplevel, Button, messagebox, Scrollbar, Spinbox, Checkbutton, IntVar
+from tkinter import Toplevel, Button, Scrollbar, Spinbox, Checkbutton, IntVar
+from PIL import Image, ImageTk
 from NpcManager import NpcManager
 
 class LokacjaNpcList:
@@ -8,8 +10,10 @@ class LokacjaNpcList:
         self.location = location
         self.save_data = save_data
         self.save_filename = save_filename
+
         self.resources_path = resources_path
         self.on_data_updated = on_data_updated
+        self.icon_refs = {}  # zapobiega garbage collection
 
         self.window = Toplevel(master)
         self.window.title("Postacie w tej lokacji")
@@ -35,7 +39,7 @@ class LokacjaNpcList:
         self.canvas.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
         self.scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
 
-        self.npc_vars = {}  # npc_id -> IntVar
+        self.npc_vars = {}
 
         button_frame = tk.Frame(self.window)
         button_frame.pack(pady=10)
@@ -50,6 +54,7 @@ class LokacjaNpcList:
             widget.destroy()
 
         self.npc_vars.clear()
+        self.icon_refs.clear()
 
         npc_ids = self.location.get("npcs", [])
         ilości = self.location.setdefault("npc_ilosci", {})
@@ -67,8 +72,33 @@ class LokacjaNpcList:
             cb = Checkbutton(row, variable=var)
             cb.pack(side=tk.LEFT)
 
+            # Ikona 20x20 z lewej
+            icon_label = tk.Label(row)
+            icon_label.pack(side=tk.LEFT, padx=(5, 10))
+
+            icon = None
+            icon_path = npc.get("obraz")
+            if icon_path:
+                full_path = os.path.join(self.resources_path, icon_path)
+                if os.path.isfile(full_path):
+                    try:
+                        img = Image.open(full_path)
+                        img = img.resize((20, 20), Image.LANCZOS)
+                        icon = ImageTk.PhotoImage(img)
+                    except Exception:
+                        pass
+
+            # jeśli nie wczytano obrazu, użyj białego kwadratu
+            if not icon:
+                img = Image.new("RGB", (20, 20), color="white")
+                icon = ImageTk.PhotoImage(img)
+
+            icon_label.configure(image=icon)
+            icon_label.image = icon
+            self.icon_refs[npc_id] = icon
+
             name_label = tk.Label(row, text=npc.get("nazwa", "[bezimienny]"), anchor="w")
-            name_label.pack(side=tk.LEFT)
+            name_label.pack(side=tk.LEFT, expand=True)
             name_label.bind("<Double-Button-1>", lambda e, n=npc: self.open_npc_editor(n))
 
             qty_var = tk.StringVar()

@@ -7,8 +7,8 @@ from TypyLokacji import TypyLokacji
 from MapManager import MapManager
 from NpcManager import NpcManager
 
-RESOURCES_PATH = os.path.join(os.path.dirname(__file__), '..', 'Resources')
-SAVES_PATH = os.path.join(os.path.dirname(__file__), '..', 'Saves')
+RESOURCES_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'Resources'))
+SAVES_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'Saves'))
 
 app_context = {
     "data": None,
