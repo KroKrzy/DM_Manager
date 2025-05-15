@@ -2,7 +2,7 @@
 import os
 import json
 import tkinter as tk
-from tkinter import Toplevel, Label, Entry, Button, StringVar, OptionMenu, filedialog, messagebox
+from tkinter import Toplevel, Label, Entry, Button, StringVar, OptionMenu, filedialog, messagebox, BooleanVar
 
 class Lokacja:
     def __init__(self, master, location, save_data, save_filename, resources_path, on_close):
@@ -26,6 +26,9 @@ class Lokacja:
         all_types = ["domyślna"] + [t["nazwa"] for t in save_data.get("location_types", [])]
         self.type_var = StringVar(value=location.get("typ", "domyślna"))
         OptionMenu(self.window, self.type_var, *all_types).pack()
+
+        self.label_var = BooleanVar(value=location.get("etykieta", False))
+        tk.Checkbutton(self.window, text="Pokaż etykietę", variable=self.label_var).pack()
 
         Label(self.window, text="Mapa lokacji (opcjonalnie):").pack(pady=(10, 2))
 
@@ -104,6 +107,8 @@ class Lokacja:
     def save(self):
         self.location["nazwa"] = self.name_var.get()
         self.location["typ"] = self.type_var.get()
+        self.location["etykieta"] = self.label_var.get()
+
         with open(self.save_filename, 'w', encoding='utf-8') as f:
             json.dump(self.save_data, f, ensure_ascii=False, indent=2)
         self.on_close()

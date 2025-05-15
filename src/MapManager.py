@@ -93,6 +93,25 @@ class MapManager:
                 item = self.canvas.create_rectangle(x-16, y-16, x+16, y+16, fill="white", outline="black")
         else:
             item = self.canvas.create_rectangle(x-16, y-16, x+16, y+16, fill="white", outline="black")
+        if location.get("etykieta") and location.get("nazwa"):
+            label_text = location["nazwa"]
+            text_id = self.canvas.create_text(
+                x, y - 28,
+                text=label_text,
+                fill="white",
+                font=("Arial", 9, "bold"),
+                anchor="n"
+            )
+
+            bbox = self.canvas.bbox(text_id)
+            if bbox:
+                x0, y0, x1, y1 = bbox
+                padding = 4
+                rect_id = self.canvas.create_rectangle(
+                    x0 - padding, y0 - padding, x1 + padding, y1 + padding,
+                    fill="black", outline=""
+                )
+                self.canvas.tag_raise(text_id, rect_id)
 
         self.canvas.tag_bind(item, "<Button-1>", lambda e, loc=location: self.on_location_click(loc))
 

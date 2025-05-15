@@ -41,19 +41,80 @@ class NpcEditor:
         Button(left_frame, text="Zmień kartę postaci", command=self.set_character_sheet).pack(pady=5)
         Button(left_frame, text="Pokaż kartę postaci", command=self.show_character_sheet).pack(pady=10)
 
-        Label(right_frame, text="Opis:").pack(anchor="w")
-        self.desc_text = Text(right_frame, height=5)
-        self.desc_text.pack(fill=tk.BOTH, expand=True)
+        desc_label = Label(right_frame, text="Opis:")
+        desc_label.pack(anchor="w")
+
+        desc_frame = tk.Frame(right_frame)
+        desc_frame.pack(fill=tk.BOTH, expand=True)
+
+        desc_scrollbar = tk.Scrollbar(desc_frame)
+        desc_scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+
+        self.desc_text = Text(desc_frame, height=5, wrap=tk.WORD, yscrollcommand=desc_scrollbar.set)
+        self.desc_text.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
         self.desc_text.insert(tk.END, npc.get("opis", ""))
 
+        desc_scrollbar.config(command=self.desc_text.yview)
+
         Label(right_frame, text="Ekwipunek:").pack(anchor="w")
-        self.eq_text = Text(right_frame, height=5)
-        self.eq_text.pack(fill=tk.BOTH, expand=True)
+
+        eq_frame = tk.Frame(right_frame)
+        eq_frame.pack(fill=tk.BOTH, expand=True)
+
+        eq_scrollbar = tk.Scrollbar(eq_frame)
+        eq_scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+
+        self.eq_text = Text(eq_frame, height=5, wrap=tk.WORD, yscrollcommand=eq_scrollbar.set)
+        self.eq_text.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
         self.eq_text.insert(tk.END, npc.get("ekwipunek", ""))
 
+        eq_scrollbar.config(command=self.eq_text.yview)
+
         Label(self.window, text="Lokalizacje NPC:", font=("Arial", 10, "bold")).pack(pady=(10, 0))
+
+        locations_frame = tk.Frame(self.window)
+        locations_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=(0, 10))
+
+        canvas = tk.Canvas(locations_frame, height=100)
+        scrollbar = tk.Scrollbar(locations_frame, orient="vertical", command=canvas.yview)
+        scrollable = tk.Frame(canvas)
+
+        scrollable.bind(
+            "<Configure>",
+            lambda e: canvas.configure(scrollregion=canvas.bbox("all"))
+        )
+
+        canvas.create_window((0, 0), window=scrollable, anchor="nw")
+        canvas.configure(yscrollcommand=scrollbar.set)
+
+        canvas.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+
+        # Dodaj etykiety lokalizacji
+        Label(self.window, text="Lokalizacje NPC:", font=("Arial", 10, "bold")).pack(pady=(10, 0))
+
+        locations_frame = tk.Frame(self.window)
+        locations_frame.pack(fill=tk.BOTH, expand=False, padx=10, pady=(0, 10))
+
+        canvas = tk.Canvas(locations_frame, height=100)
+        scrollbar = tk.Scrollbar(locations_frame, orient="vertical", command=canvas.yview)
+        scrollable = tk.Frame(canvas)
+
+        # 👇 poprawne przypięcie frame do canvas
+        canvas.create_window((0, 0), window=scrollable, anchor="nw")
+        canvas.configure(yscrollcommand=scrollbar.set)
+
+        scrollable.bind(
+            "<Configure>",
+            lambda e: canvas.configure(scrollregion=canvas.bbox("all"))
+        )
+
+        canvas.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+
+        # 🔁 Ścieżki z pełnej struktury lokacji
         for path in self.resolve_location_paths():
-            Label(self.window, text=path, wraplength=750, justify="center", fg="gray").pack()
+            tk.Label(scrollable, text=path, wraplength=700, justify="left", fg="gray").pack(anchor="w", padx=5)
 
         Button(self.window, text="Zapisz", command=self.save).pack(pady=10)
 
@@ -121,22 +182,23 @@ class NpcEditor:
                 messagebox.showerror("Błąd", f"Nie udało się otworzyć pliku PDF:\n{e}")
 
     def resolve_location_paths(self):
-        ids = set(self.npc.get("lokacje", []))
-        if not ids:
-            return ["(brak przypisanych lokalizacji)"]
+        npc_id = self.npc.get("id")
+        result = []
 
-        result_paths = []
-
-        def walk(locations, path):
+        def recurse(locations, path):
             for loc in locations:
-                new_path = path + [loc.get("nazwa", "(bez nazwy)")]
-                if loc.get("id") in ids:
-                    result_paths.append(" / ".join(new_path))
-                if "locations" in loc:
-                    walk(loc["locations"], new_path)
+                name = loc.get("nazwa", "[brak nazwy]")
+                new_path = path + [name]
 
-        walk(self.save_data.get("locations", []), [])
-        return result_paths or ["(lokacje nieznalezione)"]
+                if npc_id in loc.get("npcs", []):
+                    result.append("/".join(new_path))
+
+                recurse(loc.get("locations", []), new_path)
+
+        all_top_locations = self.save_data.get("locations", [])
+        recurse(all_top_locations, [])
+
+        return result
 
     def save(self):
         self.npc["opis"] = self.desc_text.get("1.0", tk.END).strip()

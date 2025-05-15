@@ -116,8 +116,17 @@ root.protocol("WM_DELETE_WINDOW", on_root_close)
 root.title("DM Manager")
 root.geometry("400x300")
 
-file_listbox = Listbox(root, width=50)
-file_listbox.pack(pady=10)
+frame = tk.Frame(root)
+frame.pack(pady=10)
+
+scrollbar = tk.Scrollbar(frame)
+scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+
+file_listbox = Listbox(frame, width=50, yscrollcommand=scrollbar.set)
+file_listbox.pack(side=tk.LEFT, fill=tk.BOTH)
+
+scrollbar.config(command=file_listbox.yview)
+
 
 btn_open = Button(root, text="Otwórz", command=open_selected_file)
 btn_open.pack(pady=5)
