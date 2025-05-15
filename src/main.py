@@ -5,6 +5,7 @@ import tkinter as tk
 from tkinter import messagebox, simpledialog, Listbox, Button, filedialog
 from TypyLokacji import TypyLokacji
 from MapManager import MapManager
+from NpcManager import NpcManager
 
 RESOURCES_PATH = os.path.join(os.path.dirname(__file__), '..', 'Resources')
 SAVES_PATH = os.path.join(os.path.dirname(__file__), '..', 'Saves')
@@ -95,6 +96,11 @@ def open_file(filename):
 
         show_map(img_file)
 
+def on_root_close():
+    root.destroy()
+    os._exit(0)  # wymuszone zamknięcie nawet jeśli inne okna istnieją
+
+
 def show_map(image_path):
     root.geometry("1000x600")
     file_listbox.pack_forget()
@@ -105,6 +111,8 @@ def show_map(image_path):
 
 # === GUI ===
 root = tk.Tk()
+root.protocol("WM_DELETE_WINDOW", on_root_close)
+
 root.title("DM Manager")
 root.geometry("400x300")
 
@@ -132,6 +140,14 @@ btn_types = Button(
     command=lambda: TypyLokacji(root, app_context["data"], app_context["file_path"], RESOURCES_PATH).window.lift()
 )
 btn_types.pack(pady=5)
+
+btn_npc = Button(
+    left_panel,
+    text="Zarządzaj NPC",
+    command=lambda: NpcManager(root, app_context["data"], app_context["file_path"], None, RESOURCES_PATH, assign_mode=False)
+
+)
+btn_npc.pack(pady=5)
 
 refresh_file_list()
 root.mainloop()

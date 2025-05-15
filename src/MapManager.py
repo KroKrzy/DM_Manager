@@ -8,8 +8,9 @@ from PIL import Image, ImageTk
 from Lokacja import Lokacja
 
 class MapManager:
-    def __init__(self, master_frame, app_context):
+    def __init__(self, master_frame, app_context, sub_mode=False):
         self.app_context = app_context
+        self.sub_mode = sub_mode
         self.canvas = tk.Canvas(master_frame, width=800, height=600, bg="white")
         self.canvas.pack(side=tk.RIGHT)
         self.image_tk = None
@@ -31,9 +32,9 @@ class MapManager:
 
         self.canvas.bind("<Button-1>", self.on_canvas_click)
 
-        # Rysuj lokacje
-        if "locations" in self.app_context["data"]:
-            for loc in self.app_context["data"]["locations"]:
+        data = self.app_context["data"]
+        if "locations" in data:
+            for loc in data["locations"]:
                 self.draw_location_icon(loc)
 
     def enable_add_location(self):
@@ -52,7 +53,7 @@ class MapManager:
         x, y = event.x, event.y
         name = simpledialog.askstring("Nowa lokacja", "Podaj nazwę lokacji (opcjonalnie):")
 
-        type_names = [t["nazwa"] for t in data.get("location_types", [])]
+        type_names = [t["nazwa"] for t in self.get_all_types()]
         selected_type = self.ask_type_selection(type_names)
 
         loc_id = str(uuid.uuid4())
@@ -73,7 +74,7 @@ class MapManager:
         typ = location.get("typ", "domyślna")
         icon_filename = None
 
-        for t in self.app_context["data"].get("location_types", []):
+        for t in self.get_all_types():
             if t["nazwa"] == typ:
                 icon_filename = t["ikona"]
                 break
@@ -96,15 +97,39 @@ class MapManager:
         self.canvas.tag_bind(item, "<Button-1>", lambda e, loc=location: self.on_location_click(loc))
 
     def on_location_click(self, location):
-        Lokacja(self.canvas, location, self.app_context["data"], self.app_context["file_path"], self.app_context["resources_path"], self.refresh)
+        Lokacja(
+            self.canvas,
+            location,
+            self.app_context.get("parent_data") or self.app_context["data"],
+            self.app_context["file_path"],
+            self.app_context["resources_path"],
+            self.refresh
+        )
 
     def refresh(self):
-        map_file = os.path.join(self.app_context["resources_path"], self.app_context["data"]["world_map"])
+        map_key = "sub_map" if self.sub_mode else "world_map"
+        map_file = os.path.join(self.app_context["resources_path"], self.app_context["data"][map_key])
         self.load_map(map_file)
 
     def save(self):
-        with open(self.app_context["file_path"], 'w', encoding='utf-8') as f:
-            json.dump(self.app_context["data"], f, ensure_ascii=False, indent=2)
+        if self.sub_mode:
+            parent_data = self.app_context["parent_data"]
+            loc = self.app_context["data"]
+            for l in parent_data["locations"]:
+                if l["id"] == loc["id"]:
+                    l["locations"] = loc.get("locations", [])
+                    break
+            with open(self.app_context["file_path"], 'w', encoding='utf-8') as f:
+                json.dump(parent_data, f, ensure_ascii=False, indent=2)
+        else:
+            with open(self.app_context["file_path"], 'w', encoding='utf-8') as f:
+                json.dump(self.app_context["data"], f, ensure_ascii=False, indent=2)
+
+    def get_all_types(self):
+        if self.sub_mode:
+            return self.app_context["parent_data"].get("location_types", [])
+        else:
+            return self.app_context["data"].get("location_types", [])
 
     def ask_type_selection(self, type_names):
         type_window = tk.Toplevel(self.canvas)

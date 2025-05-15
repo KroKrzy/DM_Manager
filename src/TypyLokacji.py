@@ -1,9 +1,9 @@
+
 import os
 import json
 import tkinter as tk
 from tkinter import Toplevel, Label, Button, filedialog, simpledialog, messagebox
 from PIL import Image, ImageTk
-
 
 class TypyLokacji:
     def __init__(self, master, save_data, save_filename, resources_path):
@@ -23,25 +23,40 @@ class TypyLokacji:
             self.save_data["location_types"] = []
             self.save()
 
-        self.list_frame = tk.Frame(self.frame)
-        self.list_frame.pack(fill=tk.BOTH, expand=True)
+        # Scrollable area
+        self.canvas = tk.Canvas(self.frame)
+        self.scrollbar = tk.Scrollbar(self.frame, orient="vertical", command=self.canvas.yview)
+        self.scrollable_frame = tk.Frame(self.canvas)
+
+        self.scrollable_frame.bind(
+            "<Configure>",
+            lambda e: self.canvas.configure(
+                scrollregion=self.canvas.bbox("all")
+            )
+        )
+
+        self.canvas.create_window((0, 0), window=self.scrollable_frame, anchor="nw")
+        self.canvas.configure(yscrollcommand=self.scrollbar.set)
+
+        self.canvas.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        self.scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
 
         self.display_location_types()
 
-        # Przyciski
-        buttons_frame = tk.Frame(self.frame)
-        buttons_frame.pack(pady=10)
+        # Przyciski na dole
+        self.buttons_frame = tk.Frame(self.window)
+        self.buttons_frame.pack(pady=10)
 
-        Button(buttons_frame, text="Dodaj typ", command=self.add_location_type).pack(side=tk.LEFT, padx=5)
-        Button(buttons_frame, text="Edytuj typ", command=self.edit_location_type).pack(side=tk.LEFT, padx=5)
-        Button(buttons_frame, text="Usuń typ", command=self.remove_location_type).pack(side=tk.LEFT, padx=5)
+        Button(self.buttons_frame, text="Dodaj typ", command=self.add_location_type).pack(side=tk.LEFT, padx=5)
+        Button(self.buttons_frame, text="Edytuj typ", command=self.edit_location_type).pack(side=tk.LEFT, padx=5)
+        Button(self.buttons_frame, text="Usuń typ", command=self.remove_location_type).pack(side=tk.LEFT, padx=5)
 
     def display_location_types(self):
-        for widget in self.list_frame.winfo_children():
+        for widget in self.scrollable_frame.winfo_children():
             widget.destroy()
 
         for index, typ in enumerate(self.save_data["location_types"]):
-            row = tk.Frame(self.list_frame)
+            row = tk.Frame(self.scrollable_frame)
             row.pack(fill=tk.X, padx=5, pady=2)
 
             # Nazwa z lewej
@@ -62,12 +77,10 @@ class TypyLokacji:
 
             icon_label.pack(side=tk.RIGHT, padx=(0, 5))
 
-            # Klikalne – zaznaczenie
             row.bind("<Button-1>", lambda e, idx=index: self.select_index(idx))
             name_label.bind("<Button-1>", lambda e, idx=index: self.select_index(idx))
             icon_label.bind("<Button-1>", lambda e, idx=index: self.select_index(idx))
 
-            # Wyróżnienie zaznaczenia
             if index == self.selected_index:
                 row.config(bg="#d0e0ff")
                 name_label.config(bg="#d0e0ff")
@@ -109,7 +122,6 @@ class TypyLokacji:
         if new_name:
             typ["nazwa"] = new_name
 
-        # Pytanie o zmianę ikony
         if messagebox.askyesno("Ikona", "Czy chcesz zmienić ikonę?"):
             filetypes = [("Pliki graficzne", "*.png *.jpg *.jpeg *.bmp")]
             icon_file = filedialog.askopenfilename(
@@ -127,21 +139,11 @@ class TypyLokacji:
         if self.selected_index is None:
             return
 
-        typ = self.save_data["location_types"][self.selected_index]
-        typ_nazwa = typ["nazwa"]
-
-        if not messagebox.askyesno("Potwierdzenie", f"Czy na pewno usunąć typ \"{typ_nazwa}\"?"):
+        if not messagebox.askyesno("Potwierdzenie", "Czy na pewno usunąć ten typ?"):
             return
 
-        # Usuń typ z listy
         del self.save_data["location_types"][self.selected_index]
         self.selected_index = None
-
-        # Podmień w lokacjach na "domyślna"
-        for loc in self.save_data.get("locations", []):
-            if loc.get("typ") == typ_nazwa:
-                loc["typ"] = "domyślna"
-
         self.save()
         self.display_location_types()
 
